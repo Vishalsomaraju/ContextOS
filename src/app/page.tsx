@@ -138,6 +138,14 @@ export default function Home() {
   const processIntentResult = (result: IntentResult) => {
     console.log("[ContextOS] Processing Intent Result:", result);
 
+    if (result.error) {
+      setPendingReminder(null);
+      setStatus("unhandled");
+      setStatusMessage("Could not process intent");
+      setStatusSubtitle(result.error);
+      return;
+    }
+
     if (result.intent === "create_reminder" && result.title) {
       if (result.confidence >= 0.85) {
         setPendingReminder(null);

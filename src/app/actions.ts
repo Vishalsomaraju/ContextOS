@@ -12,7 +12,39 @@ export interface IntentResult {
 }
 
 export async function extractIntent(transcript: string): Promise<IntentResult> {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  let apiKey: string | undefined = undefined;
+
+  // In development, prioritize reading directly from .env.local / .env so updates apply immediately without server restart
+  if (typeof window === "undefined" && process.env.NODE_ENV !== "production") {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require("fs");
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const path = require("path");
+      for (const envFile of [".env.local", ".env"]) {
+        const envPath = path.resolve(/*turbopackIgnore: true*/ process.cwd(), envFile);
+        if (fs.existsSync(envPath)) {
+          const content = fs.readFileSync(envPath, "utf8");
+          const match = content.match(/GEMINI_API_KEY=(.*)/);
+          if (match && match[1]?.trim()) {
+            apiKey = match[1].trim();
+            break;
+          }
+        }
+      }
+    } catch {
+      // Ignore filesystem fallback error
+    }
+  }
+
+  if (!apiKey) {
+    apiKey = process.env.GEMINI_API_KEY?.trim();
+  }
+
+  if (apiKey) {
+    // Strip optional surrounding single or double quotes
+    apiKey = apiKey.replace(/^["']|["']$/g, "").trim();
+  }
 
   // Current server date context for relative date resolution
   const now = new Date();
@@ -74,13 +106,13 @@ export async function extractIntent(transcript: string): Promise<IntentResult> {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.1,
-      },
-    });
+    const candidateModels = [
+      process.env.GEMINI_MODEL,
+      "gemini-2.5-flash",
+      "gemini-3.5-flash",
+      "gemini-flash-latest",
+      "gemini-1.5-flash",
+    ].filter(Boolean) as string[];
 
     const systemInstruction = `You are ContextOS, an intelligent on-device context extraction engine.
 Your task is to extract calendar and reminder intents from casual speech transcripts.
@@ -118,14 +150,44 @@ Return STRICT JSON ONLY matching this schema:
 
     const prompt = `${systemInstruction}\n\nTranscript: "${transcript}"`;
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text().trim();
+    let responseText = "";
+    let lastError: unknown = null;
 
-    const cleanJson = responseText
+    for (const modelName of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1,
+          },
+        });
+        const result = await model.generateContent(prompt);
+        responseText = result.response.text().trim();
+        if (responseText) {
+          break;
+        }
+      } catch (err) {
+        lastError = err;
+        console.warn(`[ContextOS] Model '${modelName}' failed, trying fallback...`);
+      }
+    }
+
+    if (!responseText && lastError) {
+      throw lastError;
+    }
+
+    let cleanJson = responseText
       .replace(/^```json\s*/i, "")
       .replace(/^```\s*/i, "")
       .replace(/\s*```$/i, "")
       .trim();
+
+    const firstBrace = cleanJson.indexOf("{");
+    const lastBrace = cleanJson.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
+    }
 
     const parsed: IntentResult = JSON.parse(cleanJson);
 
