@@ -12,6 +12,10 @@ out/
 build/
 **/build/
 
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
 # Local env files
 .env*.local
 **/.env*.local
