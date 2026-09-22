@@ -4,29 +4,74 @@ node_modules/
 .pnp
 .pnp.js
 
-# Next.js build
+# Next.js & Build Outputs
 .next/
 **/.next/
 out/
 **/out/
 build/
 **/build/
+dist/
+.vercel/
 
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-# Local env files
+# Environment Variables & Secrets
+.env
 .env*.local
-**/.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.env.*
+!.env.example
 
-# Logs
+# Pitch Decks, Presentations & Office Binaries
+*.pptx
+*.ppt
+*.key
+*.odp
+
+# Debug & Runtime Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# OS / IDE
+# OS-Specific Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
+
+# IDE & Editor Configurations
 .vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+*~
+
+# Testing & Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Temporary & Cache Files
+*.tmp
+*.temp
+.cache/
+.eslintcache
+.turbo/
